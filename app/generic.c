@@ -39,7 +39,7 @@
 
 void GENERIC_Key_F(bool bKeyPressed, bool bKeyHeld)
 {
-    #ifdef ENABLE_F4HWN_FEAT_MENU_LOCK
+    #ifdef ENABLE_FEAT_F4HWN_RESCUE_OPS
         if(gEeprom.MENU_LOCK == true)
         {
             if (bKeyHeld || !bKeyPressed) { // held or released
