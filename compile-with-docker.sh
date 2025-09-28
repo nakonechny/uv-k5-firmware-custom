@@ -2,6 +2,7 @@
 
 IMAGE_NAME="uvk5"
 FIRMWARE_DIR="${PWD}/compiled-firmware"
+BASE="${BASE:-alpine}"   # 'alpine' (default) or 'arch'
 
 # Create firmware output directory if it doesn't exist
 mkdir -p "$FIRMWARE_DIR"
@@ -13,29 +14,45 @@ rm -f "$FIRMWARE_DIR"/*
 echo "🧽 Cleaning up old Docker artifacts..."
 docker system prune -f --volumes >/dev/null 2>&1 || true
 
+# Build args / platform according to the base
+BUILD_ARGS=""
+if [ "$BASE" = "arch" ]; then
+  # Arch runs on amd64 (emulation possible on Mac Silicon)
+  BUILD_ARGS="--build-arg ARCH_PLATFORM=linux/amd64"
+fi
+
 # Always rebuild the Docker image to ensure latest code changes
-echo "⚙️ Rebuilding Docker image '$IMAGE_NAME'..."
+echo "⚙️ Rebuilding Docker image '$IMAGE_NAME' (base=${BASE})..."
 docker rmi "$IMAGE_NAME" 2>/dev/null || true
-if ! docker build --build-arg BUILDPLATFORM=linux/amd64 -t "$IMAGE_NAME" .; then
+if ! docker build --pull --target "toolchain-${BASE}" $BUILD_ARGS -t "$IMAGE_NAME" .; then
     echo "❌ Failed to build docker image"
     exit 1
+fi
+
+# Platform at runtime (for arch on amd64)
+RUN_PLATFORM_ARG=""
+if [ "$BASE" = "arch" ]; then
+  RUN_PLATFORM_ARG="--platform=linux/amd64"
 fi
 
 # -------------------- CLEAN ALL ---------------------
 
 clean() {
     echo "🧽 Cleaning all"
-    docker rmi uvk5
-    docker buildx prune -f
-    docker buildx history ls | awk 'NR>1 {print $1}' | xargs docker buildx history rm
-    make clean
+    docker rmi "$IMAGE_NAME" 2>/dev/null || true
+    docker buildx prune -f || true
+    # Optional: if you use buildx history
+    if command -v docker >/dev/null 2>&1 && docker buildx help history >/dev/null 2>&1; then
+      docker buildx history ls | awk 'NR>1 {print $1}' | xargs docker buildx history rm || true
+    fi
+    make clean || true
 }
 
 # ------------------ BUILD VARIANTS ------------------
 
 custom() {
     echo "🔧 Custom compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         rm -f ./compiled-firmware/* && cd /app && make -s \
         EDITION_STRING=Custom \
         TARGET=f4hwn.custom \
@@ -44,7 +61,7 @@ custom() {
 
 standard() {
     echo "📦 Standard compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         rm -f ./compiled-firmware/* && cd /app && make -s \
         ENABLE_SPECTRUM=0 \
         ENABLE_FMRADIO=0 \
@@ -57,7 +74,7 @@ standard() {
 
 bandscope() {
     echo "📺 Bandscope compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         rm -f ./compiled-firmware/* && cd /app && make -s \
         ENABLE_SPECTRUM=1 \
         ENABLE_FMRADIO=0 \
@@ -76,7 +93,7 @@ bandscope() {
 
 broadcast() {
     echo "📻 Broadcast compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         cd /app && make -s \
         ENABLE_SPECTRUM=0 \
         ENABLE_FMRADIO=1 \
@@ -94,8 +111,8 @@ broadcast() {
 }
 
 basic() {
-    echo "☘️ Basic compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    echo "☘️ Basic compilation."
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         cd /app && make -s \
         ENABLE_SPECTRUM=1 \
         ENABLE_FMRADIO=1 \
@@ -120,7 +137,7 @@ basic() {
 
 rescueops() {
     echo "🚨 RescueOps compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         cd /app && make -s \
         ENABLE_SPECTRUM=0 \
         ENABLE_FMRADIO=0 \
@@ -139,7 +156,7 @@ rescueops() {
 
 game() {
     echo "🎮 Game compilation..."
-    docker run --rm -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
+    docker run --rm $RUN_PLATFORM_ARG -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         cd /app && make -s \
         ENABLE_SPECTRUM=0 \
         ENABLE_FMRADIO=1 \
@@ -174,7 +191,7 @@ case "$1" in
         game
         ;;
     *)
-        echo "Usage: $0 {clean|custom|standard|bandscope|broadcast|basic|rescueops|game|all}"
+        echo "Usage: BASE={alpine|arch} $0 {clean|custom|standard|bandscope|broadcast|basic|rescueops|game|all}"
         exit 1
         ;;
 esac

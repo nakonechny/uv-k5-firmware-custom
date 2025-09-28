@@ -1,11 +1,35 @@
-ARG BUILDPLATFORM
-FROM --platform=${BUILDPLATFORM} archlinux:latest
-RUN pacman -Syyu base-devel --noconfirm
-RUN pacman -Syyu arm-none-eabi-gcc --noconfirm
-RUN pacman -Syyu arm-none-eabi-newlib --noconfirm
-RUN pacman -Syyu git --noconfirm
-RUN pacman -Syyu python-pip --noconfirm
-RUN pacman -Syyu python-crcmod --noconfirm
+# syntax=docker/dockerfile:1.6
+
+# Plateforme par défaut pour Arch (utile sur Mac M1/M2)
+ARG ARCH_PLATFORM=linux/amd64
+
+########################
+# Stage: Arch toolchain
+########################
+FROM --platform=${ARCH_PLATFORM} archlinux:latest AS toolchain-arch
+RUN pacman -Syu --noconfirm && \
+    pacman -S --noconfirm --needed \
+      base-devel \
+      arm-none-eabi-gcc \
+      arm-none-eabi-newlib \
+      git \
+      python-pip \
+      python-crcmod
 WORKDIR /app
 COPY . .
-RUN git submodule update --init --recursive
+
+#########################
+# Stage: Alpine toolchain
+#########################
+FROM alpine:3.22 AS toolchain-alpine
+RUN apk add --no-cache \
+      bash \
+      build-base \
+      gcc-arm-none-eabi \
+      newlib-arm-none-eabi \
+      python3 \
+      py3-crcmod \
+      py3-pip \
+      git
+WORKDIR /app
+COPY . .
