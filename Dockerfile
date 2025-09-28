@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-# Plateforme par défaut pour Arch (utile sur Mac M1/M2)
+# Default platform for Arch (useful on Mac Silicon)
 ARG ARCH_PLATFORM=linux/amd64
 
 ########################
