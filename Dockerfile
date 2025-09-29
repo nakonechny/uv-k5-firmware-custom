@@ -1,27 +1,12 @@
 # syntax=docker/dockerfile:1.6
 
-# Default platform for Arch (useful on Mac Silicon)
-ARG ARCH_PLATFORM=linux/amd64
+# Parametric Alpine tag. Override at build time with:
+#   docker build --build-arg ALPINE_TAG=3.21 -t uvk5 .
+# Examples: 3.22, 3.21, 3.19, edge
+ARG ALPINE_TAG=3.21
+FROM alpine:${ALPINE_TAG}
 
-########################
-# Stage: Arch toolchain
-########################
-FROM --platform=${ARCH_PLATFORM} archlinux:latest AS toolchain-arch
-RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm --needed \
-      base-devel \
-      arm-none-eabi-gcc \
-      arm-none-eabi-newlib \
-      git \
-      python-pip \
-      python-crcmod
-WORKDIR /app
-COPY . .
-
-#########################
-# Stage: Alpine toolchain
-#########################
-FROM alpine:3.22 AS toolchain-alpine
+# Toolchain and utilities needed to build the firmware
 RUN apk add --no-cache \
       bash \
       build-base \
@@ -31,5 +16,9 @@ RUN apk add --no-cache \
       py3-crcmod \
       py3-pip \
       git
+
+# Project workspace
 WORKDIR /app
+
+# Copy sources into the image (the script mounts the repo and runs builds)
 COPY . .
