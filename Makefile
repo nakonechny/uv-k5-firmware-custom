@@ -79,6 +79,7 @@ ENABLE_CLANG                    ?= 0
 ENABLE_SWD                      ?= 0
 ENABLE_OVERLAY                  ?= 0
 ENABLE_LTO                      ?= 1
+ENABLE_EXPERIMENTAL_CLFAGS      ?= 1
 
 #############################################################
 
@@ -288,6 +289,10 @@ ifeq ($(ENABLE_CLANG),0)
 else
 	# Oz needed to make it fit on flash
 	CFLAGS += -Oz -Wall -Werror -mcpu=cortex-m0 -fno-builtin -fshort-enums -fno-delete-null-pointer-checks -std=c2x -MMD
+endif
+
+ifeq ($(ENABLE_EXPERIMENTAL_CLFAGS),1)
+	CFLAGS += -funroll-loops
 endif
 
 ifeq ($(ENABLE_LTO),1)
