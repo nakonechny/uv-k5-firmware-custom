@@ -9,3 +9,6 @@ compile_commands.json
 .vscode
 /docs
 k5_eeprom.raw
+f4hwn
+f4hwn.*
+!archive/f4hwn*
