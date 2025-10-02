@@ -883,6 +883,8 @@ uint8_t Rssi2Y(uint16_t rssi)
         for (uint8_t i = 0; i < bars; ++i)
         {
             uint16_t rssi = rssiHistory[(bars>128) ? i >> settings.stepsCount : i];
+            // stretch bars to fill the screen width
+            uint8_t x = i * 128 / bars + shift_graph;
 
             if (rssi != RSSI_MAX_VALUE)
             {
