@@ -35,6 +35,11 @@
 #include "driver/eeprom.h"
 #endif
 
+#include "board.h"
+bool gTailFound;
+static void setTailFoundInterrupt();
+static void checkIfTailFound();
+
 struct FrequencyBandInfo
 {
     uint32_t lower;
@@ -369,6 +374,34 @@ static void ResetPeak()
     peak.rssi = 0;
 }
 
+void setTailFoundInterrupt()
+{
+    gTailFound = false;
+    BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
+}
+
+void checkIfTailFound()
+{
+  uint16_t interrupt_status_bits;
+  // if interrupt waiting to be handled
+  if(BK4819_ReadRegister(BK4819_REG_0C) & 1u) {
+    // reset the interrupt
+    BK4819_WriteRegister(BK4819_REG_02, 0);
+    // fetch the interrupt status bits
+    interrupt_status_bits = BK4819_ReadRegister(BK4819_REG_02);
+    // if tail found interrupt
+    if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
+    {
+        gTailFound = true;
+        listenT = 0;
+        // disable interrupts
+        BK4819_WriteRegister(BK4819_REG_3F, 0);
+        // reset the interrupt
+        BK4819_WriteRegister(BK4819_REG_02, 0);
+    }
+  }
+}
+
 bool IsCenterMode() { return settings.scanStepIndex < S_STEP_2_5kHz; }
 // scan step in 0.01khz
 uint16_t GetScanStep() { return scanStepValues[settings.scanStepIndex]; }
@@ -458,8 +491,9 @@ static void ToggleRX(bool on)
 
     if (on)
     {
-        listenT = 1000;
+        listenT = 100;
         BK4819_WriteRegister(0x43, listenBWRegValues[settings.listenBw]);
+        setTailFoundInterrupt();
     }
     else
     {
@@ -1562,9 +1596,10 @@ static void UpdateListening()
     peak.rssi = scanInfo.rssi;
     redrawScreen = true;
 
-    if (IsPeakOverLevel() || monitorMode)
+    checkIfTailFound();
+    if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
     {
-        listenT = 1000;
+        listenT = 100;
         return;
     }
 
