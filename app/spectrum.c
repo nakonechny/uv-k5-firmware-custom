@@ -33,9 +33,8 @@
 
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
 #include "driver/eeprom.h"
-#endif
-
 #include "board.h"
+#endif
 
 struct FrequencyBandInfo
 {
@@ -61,7 +60,6 @@ bool newScanStart = true;
 bool preventKeypress = true;
 bool audioState = true;
 bool lockAGC = false;
-bool gTailFound = false;
 
 State currentState = SPECTRUM, previousState = SPECTRUM;
 
@@ -116,6 +114,7 @@ const int8_t LNAsOptions[] = {-19, -16, -11, 0};
 const int8_t LNAOptions[] = {-24, -19, -14, -9, -6, -4, -2, 0};
 const int8_t VGAOptions[] = {-33, -27, -21, -15, -9, -6, -3, 0};
 const char *BPFOptions[] = {"8.46", "7.25", "6.35", "5.64", "5.08", "4.62", "4.23"};
+bool gTailFound = false;
 #endif
 
 uint16_t statuslineUpdateTimer = 0;
@@ -372,33 +371,35 @@ static void ResetPeak()
     peak.rssi = 0;
 }
 
-static void setTailFoundInterrupt()
-{
-    gTailFound = false;
-    BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
-}
-
-static void checkIfTailFound()
-{
-  uint16_t interrupt_status_bits;
-  // if interrupt waiting to be handled
-  if(BK4819_ReadRegister(BK4819_REG_0C) & 1u) {
-    // reset the interrupt
-    BK4819_WriteRegister(BK4819_REG_02, 0);
-    // fetch the interrupt status bits
-    interrupt_status_bits = BK4819_ReadRegister(BK4819_REG_02);
-    // if tail found interrupt
-    if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
+#ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    static void setTailFoundInterrupt()
     {
-        gTailFound = true;
-        listenT = 0;
-        // disable interrupts
-        BK4819_WriteRegister(BK4819_REG_3F, 0);
+        gTailFound = false;
+        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
+    }
+
+    static void checkIfTailFound()
+    {
+      uint16_t interrupt_status_bits;
+      // if interrupt waiting to be handled
+      if(BK4819_ReadRegister(BK4819_REG_0C) & 1u) {
         // reset the interrupt
         BK4819_WriteRegister(BK4819_REG_02, 0);
+        // fetch the interrupt status bits
+        interrupt_status_bits = BK4819_ReadRegister(BK4819_REG_02);
+        // if tail found interrupt
+        if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
+        {
+            gTailFound = true;
+            listenT = 0;
+            // disable interrupts
+            BK4819_WriteRegister(BK4819_REG_3F, 0);
+            // reset the interrupt
+            BK4819_WriteRegister(BK4819_REG_02, 0);
+        }
+      }
     }
-  }
-}
+#endif
 
 bool IsCenterMode() { return settings.scanStepIndex < S_STEP_2_5kHz; }
 // scan step in 0.01khz
@@ -489,9 +490,14 @@ static void ToggleRX(bool on)
 
     if (on)
     {
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
         listenT = 100;
         BK4819_WriteRegister(0x43, listenBWRegValues[settings.listenBw]);
         setTailFoundInterrupt();
+    #else
+        listenT = 1000;
+        BK4819_WriteRegister(0x43, listenBWRegValues[settings.listenBw]);
+    #endif
     }
     else
     {
@@ -1595,12 +1601,20 @@ static void UpdateListening()
     peak.rssi = scanInfo.rssi;
     redrawScreen = true;
 
-    checkIfTailFound();
-    if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
-    {
-        listenT = 100;
-        return;
-    }
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+        checkIfTailFound();
+        if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
+        {
+            listenT = 100;
+            return;
+        }
+    #else
+        if (IsPeakOverLevel() || monitorMode)
+        {
+            listenT = 1000;
+            return;
+        }
+    #endif
 
     ToggleRX(false);
     ResetScanStats();
