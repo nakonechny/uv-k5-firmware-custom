@@ -36,9 +36,6 @@
 #endif
 
 #include "board.h"
-bool gTailFound;
-static void setTailFoundInterrupt();
-static void checkIfTailFound();
 
 struct FrequencyBandInfo
 {
@@ -64,6 +61,7 @@ bool newScanStart = true;
 bool preventKeypress = true;
 bool audioState = true;
 bool lockAGC = false;
+bool gTailFound = false;
 
 State currentState = SPECTRUM, previousState = SPECTRUM;
 
@@ -374,13 +372,13 @@ static void ResetPeak()
     peak.rssi = 0;
 }
 
-void setTailFoundInterrupt()
+static void setTailFoundInterrupt()
 {
     gTailFound = false;
     BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
 }
 
-void checkIfTailFound()
+static void checkIfTailFound()
 {
   uint16_t interrupt_status_bits;
   // if interrupt waiting to be handled
