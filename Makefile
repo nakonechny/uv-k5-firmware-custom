@@ -292,7 +292,7 @@ else
 endif
 
 ifeq ($(ENABLE_EXPERIMENTAL_CLFAGS),1)
-	CFLAGS += -funroll-loops
+	CFLAGS += -funroll-loops -ffat-lto-objects
 endif
 
 ifeq ($(ENABLE_LTO),1)
