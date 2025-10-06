@@ -35,10 +35,7 @@
 #include "driver/eeprom.h"
 #endif
 
-#include "board.h"
-bool gTailFound;
-static void setTailFoundInterrupt();
-static void checkIfTailFound();
+//#include "board.h"
 
 struct FrequencyBandInfo
 {
@@ -374,13 +371,7 @@ static void ResetPeak()
     peak.rssi = 0;
 }
 
-void setTailFoundInterrupt()
-{
-    gTailFound = false;
-    BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
-}
-
-void checkIfTailFound()
+bool hasTailFound()
 {
   uint16_t interrupt_status_bits;
   // if interrupt waiting to be handled
@@ -390,16 +381,15 @@ void checkIfTailFound()
     // fetch the interrupt status bits
     interrupt_status_bits = BK4819_ReadRegister(BK4819_REG_02);
     // if tail found interrupt
-    if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
+    if (interrupt_status_bits & (BK4819_REG_02_CxCSS_TAIL | BK4819_REG_02_SQUELCH_FOUND))
     {
-        gTailFound = true;
-        listenT = 0;
-        // disable interrupts
+        //disable interrupts
         BK4819_WriteRegister(BK4819_REG_3F, 0);
-        // reset the interrupt
         BK4819_WriteRegister(BK4819_REG_02, 0);
+        return true;
     }
   }
+  return false;
 }
 
 bool IsCenterMode() { return settings.scanStepIndex < S_STEP_2_5kHz; }
@@ -493,7 +483,8 @@ static void ToggleRX(bool on)
     {
         listenT = 100;
         BK4819_WriteRegister(0x43, listenBWRegValues[settings.listenBw]);
-        setTailFoundInterrupt();
+        //enable interrupts
+        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL | BK4819_REG_02_SQUELCH_FOUND);
     }
     else
     {
@@ -1571,7 +1562,8 @@ static void UpdateStill()
 static void UpdateListening()
 {
     preventKeypress = false;
-    if (currentState == STILL)
+    bool tailFound = hasTailFound();
+    if (tailFound)
     {
         listenT = 0;
     }
@@ -1596,8 +1588,7 @@ static void UpdateListening()
     peak.rssi = scanInfo.rssi;
     redrawScreen = true;
 
-    checkIfTailFound();
-    if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
+    if ((IsPeakOverLevel() && !tailFound) || monitorMode)
     {
         listenT = 100;
         return;
