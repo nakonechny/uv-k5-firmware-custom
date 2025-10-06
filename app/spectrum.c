@@ -992,36 +992,33 @@ static void DrawStatus()
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
 static void ShowChannelName(uint32_t f)
 {
-    unsigned int i;
-    char String[12];
-    memset(String, 0, sizeof(String));
+    static uint32_t channelF = 0;
+    static char channelName[12]; 
 
     if (isListening)
     {
-        for (i = 0; IS_MR_CHANNEL(i); i++)
-        {
-            if (RADIO_CheckValidChannel(i, false, 0))
+        if (f != channelF) {
+            channelF = f;
+            unsigned int i;
+            memset(channelName, 0, sizeof(channelName));
+            for (i = 0; IS_MR_CHANNEL(i); i++)
             {
-                if (SETTINGS_FetchChannelFrequency(i) == f)
+                if (RADIO_CheckValidChannel(i, false, 0))
                 {
-                    SETTINGS_FetchChannelName(String, i);
-                    if (String[0] != 0) {
-                        UI_PrintStringSmallBufferNormal(String, gStatusLine + 36);
-                        //GUI_DisplaySmallest(String, 127, 1, true, true);
+                    if (SETTINGS_FetchChannelFrequency(i) == channelF)
+                    {
+                        SETTINGS_FetchChannelName(channelName, i);
+                        break;
                     }
-                    break;
                 }
             }
+        }
+        if (channelName[0] != 0) {
+            UI_PrintStringSmallBufferNormal(channelName, gStatusLine + 36);
         }
     }
     else
     {
-        /*
-        for (int i = 36; i < 100; i++)
-        {
-            gStatusLine[i] = 0b00000000;
-        }
-        */
         memset(&gStatusLine[36], 0, 100 - 28);
     }
     ST7565_BlitStatusLine();
@@ -1352,9 +1349,6 @@ static void RenderStatus()
 {
     memset(gStatusLine, 0, sizeof(gStatusLine));
     DrawStatus();
-#ifdef ENABLE_FEAT_F4HWN_SPECTRUM
-    ShowChannelName(peak.f);
-#endif
     ST7565_BlitStatusLine();
 }
 
