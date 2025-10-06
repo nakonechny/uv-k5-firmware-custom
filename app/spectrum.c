@@ -477,9 +477,14 @@ static void ToggleAudio(bool on)
 
 static void ToggleRX(bool on)
 {
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    if (isListening == on) {
+        return;
+    }
+    #endif
     isListening = on;
 
-    RADIO_SetupAGC(on, lockAGC);
+    RADIO_SetupAGC(settings.modulationType == MODULATION_AM, lockAGC);
     BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, on);
 
     ToggleAudio(on);
@@ -1568,7 +1573,9 @@ static void UpdateStill()
     peak.rssi = scanInfo.rssi;
     AutoTriggerLevel();
 
-    ToggleRX(IsPeakOverLevel() || monitorMode);
+    if (IsPeakOverLevel() || monitorMode) {
+        ToggleRX(true);
+    }
 }
 
 static void UpdateListening()
