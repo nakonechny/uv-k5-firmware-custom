@@ -33,7 +33,6 @@
 
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
 #include "driver/eeprom.h"
-#include "board.h"
 #endif
 
 struct FrequencyBandInfo
@@ -114,7 +113,6 @@ const int8_t LNAsOptions[] = {-19, -16, -11, 0};
 const int8_t LNAOptions[] = {-24, -19, -14, -9, -6, -4, -2, 0};
 const int8_t VGAOptions[] = {-33, -27, -21, -15, -9, -6, -3, 0};
 const char *BPFOptions[] = {"8.46", "7.25", "6.35", "5.64", "5.08", "4.62", "4.23"};
-bool gTailFound = false;
 #endif
 
 uint16_t statuslineUpdateTimer = 0;
@@ -374,11 +372,10 @@ static void ResetPeak()
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
     static void setTailFoundInterrupt()
     {
-        gTailFound = false;
-        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
+        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL | BK4819_REG_02_SQUELCH_FOUND);
     }
 
-    static void checkIfTailFound()
+    static bool checkIfTailFound()
     {
       uint16_t interrupt_status_bits;
       // if interrupt waiting to be handled
@@ -390,14 +387,15 @@ static void ResetPeak()
         // if tail found interrupt
         if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
         {
-            gTailFound = true;
             listenT = 0;
             // disable interrupts
             BK4819_WriteRegister(BK4819_REG_3F, 0);
             // reset the interrupt
             BK4819_WriteRegister(BK4819_REG_02, 0);
+            return true;
         }
       }
+      return false;
     }
 #endif
 
@@ -1576,7 +1574,12 @@ static void UpdateStill()
 static void UpdateListening()
 {
     preventKeypress = false;
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    bool tailFound = checkIfTailFound();
+    if (tailFound)
+    #else
     if (currentState == STILL)
+    #endif
     {
         listenT = 0;
     }
@@ -1602,8 +1605,7 @@ static void UpdateListening()
     redrawScreen = true;
 
     #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
-        checkIfTailFound();
-        if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
+        if ((IsPeakOverLevel() && !tailFound) || monitorMode)
         {
             listenT = 100;
             return;
