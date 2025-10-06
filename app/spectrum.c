@@ -33,7 +33,6 @@
 
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
 #include "driver/eeprom.h"
-#include "board.h"
 #endif
 
 struct FrequencyBandInfo
@@ -114,7 +113,6 @@ const int8_t LNAsOptions[] = {-19, -16, -11, 0};
 const int8_t LNAOptions[] = {-24, -19, -14, -9, -6, -4, -2, 0};
 const int8_t VGAOptions[] = {-33, -27, -21, -15, -9, -6, -3, 0};
 const char *BPFOptions[] = {"8.46", "7.25", "6.35", "5.64", "5.08", "4.62", "4.23"};
-bool gTailFound = false;
 #endif
 
 uint16_t statuslineUpdateTimer = 0;
@@ -374,11 +372,10 @@ static void ResetPeak()
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
     static void setTailFoundInterrupt()
     {
-        gTailFound = false;
-        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL);
+        BK4819_WriteRegister(BK4819_REG_3F, BK4819_REG_02_CxCSS_TAIL | BK4819_REG_02_SQUELCH_FOUND);
     }
 
-    static void checkIfTailFound()
+    static bool checkIfTailFound()
     {
       uint16_t interrupt_status_bits;
       // if interrupt waiting to be handled
@@ -390,14 +387,15 @@ static void ResetPeak()
         // if tail found interrupt
         if (interrupt_status_bits & BK4819_REG_02_CxCSS_TAIL)
         {
-            gTailFound = true;
             listenT = 0;
             // disable interrupts
             BK4819_WriteRegister(BK4819_REG_3F, 0);
             // reset the interrupt
             BK4819_WriteRegister(BK4819_REG_02, 0);
+            return true;
         }
       }
+      return false;
     }
 #endif
 
@@ -479,9 +477,14 @@ static void ToggleAudio(bool on)
 
 static void ToggleRX(bool on)
 {
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    if (isListening == on) {
+        return;
+    }
+    #endif
     isListening = on;
 
-    RADIO_SetupAGC(on, lockAGC);
+    RADIO_SetupAGC(settings.modulationType == MODULATION_AM, lockAGC);
     BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, on);
 
     ToggleAudio(on);
@@ -989,36 +992,33 @@ static void DrawStatus()
 #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
 static void ShowChannelName(uint32_t f)
 {
-    unsigned int i;
-    char String[12];
-    memset(String, 0, sizeof(String));
+    static uint32_t channelF = 0;
+    static char channelName[12]; 
 
     if (isListening)
     {
-        for (i = 0; IS_MR_CHANNEL(i); i++)
-        {
-            if (RADIO_CheckValidChannel(i, false, 0))
+        if (f != channelF) {
+            channelF = f;
+            unsigned int i;
+            memset(channelName, 0, sizeof(channelName));
+            for (i = 0; IS_MR_CHANNEL(i); i++)
             {
-                if (SETTINGS_FetchChannelFrequency(i) == f)
+                if (RADIO_CheckValidChannel(i, false, 0))
                 {
-                    SETTINGS_FetchChannelName(String, i);
-                    if (String[0] != 0) {
-                        UI_PrintStringSmallBufferNormal(String, gStatusLine + 36);
-                        //GUI_DisplaySmallest(String, 127, 1, true, true);
+                    if (SETTINGS_FetchChannelFrequency(i) == channelF)
+                    {
+                        SETTINGS_FetchChannelName(channelName, i);
+                        break;
                     }
-                    break;
                 }
             }
+        }
+        if (channelName[0] != 0) {
+            UI_PrintStringSmallBufferNormal(channelName, gStatusLine + 36);
         }
     }
     else
     {
-        /*
-        for (int i = 36; i < 100; i++)
-        {
-            gStatusLine[i] = 0b00000000;
-        }
-        */
         memset(&gStatusLine[36], 0, 100 - 28);
     }
     ST7565_BlitStatusLine();
@@ -1349,9 +1349,6 @@ static void RenderStatus()
 {
     memset(gStatusLine, 0, sizeof(gStatusLine));
     DrawStatus();
-#ifdef ENABLE_FEAT_F4HWN_SPECTRUM
-    ShowChannelName(peak.f);
-#endif
     ST7565_BlitStatusLine();
 }
 
@@ -1543,7 +1540,7 @@ static void UpdateScan()
         return;
     }
 
-    if (scanInfo.measurementsCount < 128)
+    if (! (scanInfo.measurementsCount >> 7)) // if (scanInfo.measurementsCount < 128)
         memset(&rssiHistory[scanInfo.measurementsCount], 0,
                sizeof(rssiHistory) - scanInfo.measurementsCount * sizeof(rssiHistory[0]));
 
@@ -1570,13 +1567,20 @@ static void UpdateStill()
     peak.rssi = scanInfo.rssi;
     AutoTriggerLevel();
 
-    ToggleRX(IsPeakOverLevel() || monitorMode);
+    if (IsPeakOverLevel() || monitorMode) {
+        ToggleRX(true);
+    }
 }
 
 static void UpdateListening()
 {
     preventKeypress = false;
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    bool tailFound = checkIfTailFound();
+    if (tailFound)
+    #else
     if (currentState == STILL)
+    #endif
     {
         listenT = 0;
     }
@@ -1602,8 +1606,7 @@ static void UpdateListening()
     redrawScreen = true;
 
     #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
-        checkIfTailFound();
-        if ((IsPeakOverLevel() || monitorMode) && !gTailFound)
+        if ((IsPeakOverLevel() && !tailFound) || monitorMode)
         {
             listenT = 100;
             return;
