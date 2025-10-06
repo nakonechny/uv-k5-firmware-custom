@@ -1115,7 +1115,7 @@ void UI_DisplayMenu(void)
             break;
 
         case MENU_TX_LOCK:
-            if(TX_freq_check(gEeprom.VfoInfo[gEeprom.TX_VFO].pRX->Frequency) == 0)
+            if(TX_freq_check(gEeprom.VfoInfo[gEeprom.TX_VFO].pTX->Frequency) == 0)
             {
                 strcpy(String, "Inside\nF Lock\nPlan");
             }
