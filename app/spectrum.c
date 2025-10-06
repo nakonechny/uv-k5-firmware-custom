@@ -1540,7 +1540,7 @@ static void UpdateScan()
         return;
     }
 
-    if (scanInfo.measurementsCount < 128)
+    if (! (scanInfo.measurementsCount >> 7)) // if (scanInfo.measurementsCount < 128)
         memset(&rssiHistory[scanInfo.measurementsCount], 0,
                sizeof(rssiHistory) - scanInfo.measurementsCount * sizeof(rssiHistory[0]));
 
