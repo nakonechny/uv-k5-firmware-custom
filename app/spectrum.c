@@ -470,9 +470,12 @@ static void ToggleAudio(bool on)
 
 static void ToggleRX(bool on)
 {
+    if (isListening == on) {
+        return;
+    }
     isListening = on;
 
-    RADIO_SetupAGC(on, lockAGC);
+    RADIO_SetupAGC(settings.modulationType == MODULATION_AM, lockAGC);
     BK4819_ToggleGpioOut(BK4819_GPIO6_PIN2_GREEN, on);
 
     ToggleAudio(on);
@@ -1556,7 +1559,9 @@ static void UpdateStill()
     peak.rssi = scanInfo.rssi;
     AutoTriggerLevel();
 
-    ToggleRX(IsPeakOverLevel() || monitorMode);
+    if (IsPeakOverLevel() || monitorMode) {
+        ToggleRX(true);
+    }
 }
 
 static void UpdateListening()
@@ -1612,7 +1617,7 @@ static void Tick()
 #endif
 
 #ifdef ENABLE_SCAN_RANGES
-    if (gNextTimeslice_500ms)
+    if (gNextTimeslice_500ms && currentState == SPECTRUM)
     {
         gNextTimeslice_500ms = false;
 
