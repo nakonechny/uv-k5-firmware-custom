@@ -1192,10 +1192,16 @@ static void OnKeyDown(uint8_t key)
         ToggleBacklight();
         break;
     case KEY_PTT:
+#ifndef ENABLE_FEAT_F4HWN_SPECTRUM    
         SetState(STILL);
         TuneToPeak();
+#endif
         break;
     case KEY_MENU:
+#ifdef ENABLE_FEAT_F4HWN_SPECTRUM    
+        SetState(STILL);
+        TuneToPeak();
+#endif
         break;
     case KEY_EXIT:
         if (menuState)
