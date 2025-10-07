@@ -589,7 +589,7 @@ static void UpdatePeakInfoForce()
 
 static void UpdatePeakInfo()
 {
-    if (peak.f == 0 || peak.t >= 1024 || peak.rssi < scanInfo.rssiMax)
+    if (peak.f == 0 || (scanInfo.rssiMax > peak.rssi && scanInfo.rssiMax >= settings.rssiTriggerLevel ))
         UpdatePeakInfoForce();
 }
 
