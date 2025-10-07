@@ -52,8 +52,23 @@ custom() {
     echo "🔧 Compiling Custom..."
     docker run -v "$FIRMWARE_DIR:/app/compiled-firmware" "$IMAGE_NAME" /bin/bash -c "\
         rm -f ./compiled-firmware/* && cd /app && make -s \
+        ENABLE_SPECTRUM=1 \
+        ENABLE_FMRADIO=1 \
+        ENABLE_VOX=0 \
+        ENABLE_AIRCOPY=0 \
+        ENABLE_FEAT_F4HWN_SCREENSHOT=0 \
+        ENABLE_FEAT_F4HWN_GAME=0 \
+        ENABLE_FEAT_F4HWN_PMR=1 \
+        ENABLE_FEAT_F4HWN_GMRS_FRS_MURS=1 \
+        ENABLE_NOAA=0 \
+        ENABLE_FEAT_F4HWN_RESCUE_OPS=0 \
         EDITION_STRING=Custom \
         TARGET=f4hwn.custom \
+        ENABLE_TX1750=0 \
+        ENABLE_FLASHLIGHT=0 \
+        ENABLE_SMALL_BOLD=0 \
+        ENABLE_FEAT_F4HWN_SLEEP=0 \
+        ENABLE_FEAT_F4HWN_CA=0 \
         && cp f4hwn.custom* compiled-firmware/"
 }
 
