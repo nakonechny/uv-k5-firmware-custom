@@ -365,6 +365,7 @@ bool IsPeakOverLevel() { return peak.rssi >= settings.rssiTriggerLevel; }
 
 static void ResetPeak()
 {
+    peak.f = 0;
     peak.t = 0;
     peak.rssi = 0;
 }
@@ -953,9 +954,9 @@ uint8_t Rssi2Y(uint16_t rssi)
 
 static void DrawStatus()
 {
-#ifdef SPECTRUM_EXTRA_VALUES
-    sprintf(String, "%d/%d P:%d T:%d", settings.dbMin, settings.dbMax,
-            Rssi2DBm(peak.rssi), Rssi2DBm(settings.rssiTriggerLevel));
+#ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    sprintf(String, "%d/%d T:%d", settings.dbMin, settings.dbMax,
+            Rssi2DBm(settings.rssiTriggerLevel));
 #else
     sprintf(String, "%d/%d", settings.dbMin, settings.dbMax);
 #endif
@@ -995,8 +996,13 @@ static void ShowChannelName(uint32_t f)
     static uint32_t channelF = 0;
     static char channelName[12]; 
 
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    if (true)
+    {
+    #else
     if (isListening)
     {
+    #endif
         if (f != channelF) {
             channelF = f;
             unsigned int i;
@@ -1014,14 +1020,21 @@ static void ShowChannelName(uint32_t f)
             }
         }
         if (channelName[0] != 0) {
+            #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+            UI_PrintStringSmallNormal(channelName, 8, 127, 1);
+            #else 
             UI_PrintStringSmallBufferNormal(channelName, gStatusLine + 36);
+            #endif
         }
     }
     else
     {
         memset(&gStatusLine[36], 0, 100 - 28);
     }
+    #ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+    #else
     ST7565_BlitStatusLine();
+    #endif
 }
 #endif
 
