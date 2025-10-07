@@ -1076,9 +1076,16 @@ static void DrawNums()
         sprintf(String, "%u.%05u", GetFStart() / 100000, GetFStart() % 100000);
         GUI_DisplaySmallest(String, 0, 49, false, true);
 
+#ifdef ENABLE_SCAN_RANGES
+        if (!gScanRangeStart)
+        {
+#endif
         sprintf(String, "\x7F%u.%02uk", settings.frequencyChangeStep / 100,
                 settings.frequencyChangeStep % 100);
         GUI_DisplaySmallest(String, 48, 49, false, true);
+#ifdef ENABLE_SCAN_RANGES
+        }
+#endif
 
         sprintf(String, "%u.%05u", GetFEnd() / 100000, GetFEnd() % 100000);
         GUI_DisplaySmallest(String, 93, 49, false, true);
@@ -1157,9 +1164,15 @@ static void OnKeyDown(uint8_t key)
         UpdateScanStep(false);
         break;
     case KEY_2:
+#ifdef ENABLE_SCAN_RANGES
+        if (!gScanRangeStart)
+#endif
         UpdateFreqChangeStep(true);
         break;
     case KEY_8:
+#ifdef ENABLE_SCAN_RANGES
+        if (!gScanRangeStart)
+#endif
         UpdateFreqChangeStep(false);
         break;
     case KEY_UP:
@@ -1205,7 +1218,17 @@ static void OnKeyDown(uint8_t key)
         ToggleBacklight();
         break;
     case KEY_PTT:
-#ifndef ENABLE_FEAT_F4HWN_SPECTRUM    
+#ifdef ENABLE_FEAT_F4HWN_SPECTRUM
+        if (isListening)
+        {
+            //skip frequency
+            ResetPeak();
+            ToggleRX(false);
+            ResetScanStats();
+            ++scanInfo.i;
+            scanInfo.f += scanInfo.scanStep;
+        }
+#else
         SetState(STILL);
         TuneToPeak();
 #endif
